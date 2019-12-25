@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"path"
+	"strconv"
 	"strings"
 )
 
@@ -96,6 +97,7 @@ func (c *Client) propfind(path string, self bool, body string, resp interface{},
 		} else {
 			rq.Header.Add("Depth", "1")
 		}
+		rq.Header.Add("Content-Length", strconv.Itoa(len(body)))
 		rq.Header.Add("Content-Type", "application/xml;charset=UTF-8")
 		rq.Header.Add("Accept", "application/xml,text/xml")
 		rq.Header.Add("Accept-Charset", "utf-8")
