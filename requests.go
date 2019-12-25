@@ -111,6 +111,10 @@ func (c *Client) propfind(path string, self bool, body string, resp interface{},
 	}
 	defer rs.Body.Close()
 
+	if rs.StatusCode != 411 { // Work Arraound spurious Toshiba W-04 Error
+		return nil
+	}
+
 	if rs.StatusCode != 207 {
 		return fmt.Errorf("%s - %s %s", rs.Status, "PROPFIND", path)
 	}
