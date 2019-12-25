@@ -242,7 +242,7 @@ func (c *Client) Remove(path string) error {
 
 // RemoveAll removes remote files
 func (c *Client) RemoveAll(path string) error {
-	rs, err := c.req("DELETE", path, nil, nil)
+	rs, err := c.req("DELETE", path, -1, nil, nil)
 	if err != nil {
 		return newPathError("Remove", path, 400)
 	}
@@ -324,7 +324,7 @@ func (c *Client) Read(path string) ([]byte, error) {
 
 // ReadStream reads the stream for a given path
 func (c *Client) ReadStream(path string) (io.ReadCloser, error) {
-	rs, err := c.req("GET", path, nil, nil)
+	rs, err := c.req("GET", path, -1, nil, nil)
 	if err != nil {
 		return nil, newPathErrorErr("ReadStream", path, err)
 	}
@@ -339,7 +339,7 @@ func (c *Client) ReadStream(path string) (io.ReadCloser, error) {
 
 // Write writes data to a given path
 func (c *Client) Write(path string, data []byte, _ os.FileMode) error {
-	s := c.put(path, bytes.NewReader(data))
+	s := c.put(path, int64(len(data)), bytes.NewReader(data))
 	switch s {
 
 	case 200, 201, 204:
@@ -351,7 +351,7 @@ func (c *Client) Write(path string, data []byte, _ os.FileMode) error {
 			return err
 		}
 
-		s = c.put(path, bytes.NewReader(data))
+		s = c.put(path, int64(len(data)), bytes.NewReader(data))
 		if s == 200 || s == 201 || s == 204 {
 			return nil
 		}
@@ -368,7 +368,7 @@ func (c *Client) WriteStream(path string, stream io.Reader, _ os.FileMode) error
 		return err
 	}
 
-	s := c.put(path, stream)
+	s := c.put(path, -1, stream)
 
 	switch s {
 	case 200, 201, 204:

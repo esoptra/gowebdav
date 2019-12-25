@@ -6,11 +6,10 @@ import (
 	"io"
 	"net/http"
 	"path"
-	"strconv"
 	"strings"
 )
 
-func (c *Client) req(method, path string, body io.Reader, intercept func(*http.Request)) (req *http.Response, err error) {
+func (c *Client) req(method, path string, contentLength int64, body io.Reader, intercept func(*http.Request)) (req *http.Response, err error) {
 	// Tee the body, because if authorization fails we will need to read from it again.
 	var r *http.Request
 	var ba bytes.Buffer
@@ -20,6 +19,10 @@ func (c *Client) req(method, path string, body io.Reader, intercept func(*http.R
 		r, err = http.NewRequest(method, PathEscape(Join(c.root, path)), nil)
 	} else {
 		r, err = http.NewRequest(method, PathEscape(Join(c.root, path)), bb)
+	}
+
+	if contentLength >= 0 {
+		r.ContentLength = contentLength
 	}
 
 	if err != nil {
@@ -58,9 +61,9 @@ func (c *Client) req(method, path string, body io.Reader, intercept func(*http.R
 		}
 
 		if body == nil {
-			return c.req(method, path, nil, intercept)
+			return c.req(method, path, -1, nil, intercept)
 		} else {
-			return c.req(method, path, &ba, intercept)
+			return c.req(method, path, -1, &ba, intercept)
 		}
 
 	} else if rs.StatusCode == 401 {
@@ -71,7 +74,7 @@ func (c *Client) req(method, path string, body io.Reader, intercept func(*http.R
 }
 
 func (c *Client) mkcol(path string) int {
-	rs, err := c.req("MKCOL", path, nil, nil)
+	rs, err := c.req("MKCOL", path, -1, nil, nil)
 	if err != nil {
 		return 400
 	}
@@ -85,19 +88,18 @@ func (c *Client) mkcol(path string) int {
 }
 
 func (c *Client) options(path string) (*http.Response, error) {
-	return c.req("OPTIONS", path, nil, func(rq *http.Request) {
+	return c.req("OPTIONS", path, -1, nil, func(rq *http.Request) {
 		rq.Header.Add("Depth", "0")
 	})
 }
 
 func (c *Client) propfind(path string, self bool, body string, resp interface{}, parse func(resp interface{}) error) error {
-	rs, err := c.req("PROPFIND", path, strings.NewReader(body), func(rq *http.Request) {
+	rs, err := c.req("PROPFIND", path, int64(len(body)), strings.NewReader(body), func(rq *http.Request) {
 		if self {
 			rq.Header.Add("Depth", "0")
 		} else {
 			rq.Header.Add("Depth", "1")
 		}
-		rq.Header.Add("Content-Length", strconv.Itoa(len(body)))
 		rq.Header.Add("Content-Type", "application/xml;charset=UTF-8")
 		rq.Header.Add("Accept", "application/xml,text/xml")
 		rq.Header.Add("Accept-Charset", "utf-8")
@@ -117,7 +119,7 @@ func (c *Client) propfind(path string, self bool, body string, resp interface{},
 }
 
 func (c *Client) doCopyMove(method string, oldpath string, newpath string, overwrite bool) (int, io.ReadCloser) {
-	rs, err := c.req(method, oldpath, nil, func(rq *http.Request) {
+	rs, err := c.req(method, oldpath, -1, nil, func(rq *http.Request) {
 		rq.Header.Add("Destination", Join(c.root, newpath))
 		if overwrite {
 			rq.Header.Add("Overwrite", "T")
@@ -155,8 +157,8 @@ func (c *Client) copymove(method string, oldpath string, newpath string, overwri
 	return newPathError(method, oldpath, s)
 }
 
-func (c *Client) put(path string, stream io.Reader) int {
-	rs, err := c.req("PUT", path, stream, nil)
+func (c *Client) put(path string, contentLength int64, stream io.Reader) int {
+	rs, err := c.req("PUT", path, contentLength, stream, nil)
 	if err != nil {
 		return 400
 	}
